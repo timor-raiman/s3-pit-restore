@@ -35,7 +35,12 @@ from dateutil.parser import parse
 args = None
 executor = None
 transfer = None
+client = None
+dest_bucket = ''
+dest_prefix = ''
 futures = {}
+
+ExtraArgsMetadataCopy={"MetadataDirective":"COPY"}
 
 class TestS3PitRestore(unittest.TestCase):
 
@@ -161,6 +166,25 @@ def handled_by_standard(obj):
         return False
     return True
 
+def handled_by_copy(obj):
+    future = executor.submit(s3_copy_key, obj)
+    global futures
+    futures[future] = obj
+    return True
+
+def s3_copy_key(obj):
+    if args.dry_run:
+        return
+    copy_source = {
+        'Bucket': args.bucket,
+        'Key': obj["Key"],
+        'VersionId': obj["VersionId"]
+    }
+    # dest_prefix is either empty string or /-terminated
+    client.copy(copy_source, dest_bucket, dest_prefix+obj["Key"], ExtraArgs=ExtraArgsMetadataCopy)
+    return
+
+
 def download_file(obj):
     transfer.download_file(args.bucket, obj["Key"], obj["Key"], extra_args={"VersionId": obj["VersionId"]})
     unixtime = time.mktime(obj["LastModified"].timetuple())
@@ -169,6 +193,7 @@ def download_file(obj):
 def do_restore():
     pit_start_date = (parse(args.from_timestamp) if args.from_timestamp else datetime.fromtimestamp(0, timezone.utc))
     pit_end_date = (parse(args.timestamp) if args.timestamp else datetime.now(timezone.utc))
+    global client
     client = boto3.client('s3')
     global transfer
     transfer = boto3.s3.transfer.S3Transfer(client)
@@ -184,10 +209,17 @@ def do_restore():
     global executor
     executor = concurrent.futures.ThreadPoolExecutor(args.max_workers)
 
-    if not os.path.exists(dest):
-        os.makedirs(dest)
-
-    os.chdir(dest)
+    destination_is_s3 = False
+    if dest.startswith("s3://"):
+        destination_is_s3 = True
+        global dest_bucket, dest_prefix
+        dest_bucket, dest_prefix = (dest+'/')[len('s3://'):].split('/', 1)
+        dest_prefix = dest_prefix.strip('/')
+        if dest_prefix: dest_prefix = dest_prefix+'/' # Empty string or /-terminated
+    else:
+        if not os.path.exists(dest):
+            os.makedirs(dest)
+        os.chdir(dest)
 
     # AWS gives us versions chunks of maximum 1000 element, cycling here to obtain more
     while (objects["IsTruncated"] == True):
@@ -202,6 +234,10 @@ def do_restore():
                 last_obj = obj
 
                 if handled_by_glacier(obj):
+                    continue
+
+                if destination_is_s3:
+                    handled_by_copy(obj)
                     continue
 
                 if not handled_by_standard(obj):
@@ -224,7 +260,7 @@ if __name__=='__main__':
     parser.add_argument('-p', '--prefix', help='s3 path to restore from', default="")
     parser.add_argument('-t', '--timestamp', help='final point in time to restore at')
     parser.add_argument('-f', '--from-timestamp', help='starting point in time to restore from')
-    parser.add_argument('-d', '--dest', help='path where recovering to', required=True)
+    parser.add_argument('-d', '--dest', help='path where recovering to; can be an s3 bucket address', required=True)
     parser.add_argument('-e', '--enable-glacier', help='enable recovering from glacier', action='store_true')
     parser.add_argument('-v', '--verbose', help='print verbose informations from s3 objects', action='store_true')
     parser.add_argument('--dry-run', help='execute query without transferring files', action='store_true')
