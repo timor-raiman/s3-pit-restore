@@ -28,7 +28,7 @@
 # SOFTWARE.
 
 import os, sys, time, signal, argparse, boto3, botocore, \
-        unittest, concurrent.futures, shutil, uuid, time
+        unittest, concurrent.futures, shutil, uuid, codecs
 from datetime import datetime, timezone
 from dateutil.parser import parse
 
@@ -193,6 +193,21 @@ def download_file(obj):
     unixtime = time.mktime(obj["LastModified"].timetuple())
     os.utime(obj["Key"],(unixtime, unixtime))
 
+def record_manifest_for_object(obj, ofile):
+    key    = obj['Key']
+    size   = obj['Size']
+    mtime  = str(math.floor(obj['LastModified'].timestamp()*1000))
+
+    if key.endswith('/'):
+        # Skip 'folders' in the manifest
+        return
+
+    if '##' in key:
+        raise "Sesparator string '##' encountered in a key!"
+
+    ofile.write('%s##%s##%s\n'%(mtime,key,size))
+    return
+
 def do_restore():
     pit_start_date = (parse(args.from_timestamp) if args.from_timestamp else datetime.fromtimestamp(0, timezone.utc))
     pit_end_date = (parse(args.timestamp) if args.timestamp else datetime.now(timezone.utc))
@@ -208,6 +223,11 @@ def do_restore():
 
     global executor
     executor = concurrent.futures.ThreadPoolExecutor(args.max_workers)
+
+    if args.manifest_file:
+        manifest_file = codecs.open(fargs.manifest_file, 'w', 'utf-8')
+    else:
+        manifest_file = None
 
     destination_is_s3 = False
     if dest.startswith("s3://"):
@@ -252,6 +272,9 @@ def do_restore():
             # This version needs to be restored..
             last_obj = obj
 
+            if manifest_file:
+                record_manifest_for_object(obj, manifest_file)
+
             if handled_by_glacier(obj):
                 continue
 
@@ -278,6 +301,12 @@ def do_restore():
         else:
             break
 
+    if manifest_file:
+            manifest_file.close()
+    return
+
+
+
 
 if __name__=='__main__':
     signal.signal(signal.SIGINT, signal_handler)
@@ -294,6 +323,7 @@ if __name__=='__main__':
     parser.add_argument('--debug', help='enable debug output', action='store_true')
     parser.add_argument('--test', help='s3 pit restore testing', action='store_true')
     parser.add_argument('--max-workers', help='max number of concurrent download requests', default=10, type=int)
+    parser.add_argument('--manifest-file', help='path to local file (created) to output manifest to')
     args = parser.parse_args()
 
     if not args.test:
