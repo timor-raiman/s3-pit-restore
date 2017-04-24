@@ -1,0 +1,79 @@
+#!/usr/bin/env python3
+#
+# MIT License
+#
+
+import os, sys, time, signal, argparse, boto3, botocore, math
+
+from datetime import datetime, timezone
+from dateutil.parser import parse
+
+sys.stdout = open(sys.stdout.fileno(), mode='w', encoding='utf8', buffering=1)
+
+client = None
+
+def signal_handler(signal, frame):
+    print("Gracefully exiting...")
+    if executor:
+        print("Shutting down executor...")
+        executor.shutdown(wait=False)
+    if futures:
+        for future in list(futures.keys()):
+            print("Cancelling futures...")
+            if not future.running():
+                future.cancel()
+                futures.pop(future, None)
+    sys.exit(-1)
+
+def do_clean_versions():
+    global client
+    client = boto3.client('s3')
+    
+    if args.debug: boto3.set_stream_logger('botocore')
+
+    objects = client.list_objects(Bucket=args.bucket, Prefix=args.prefix) # cannot pass VersionIdMarker on first call
+    while (True):
+        contents = objects['Contents']
+        
+        while(contents):
+            obj = contents.pop(0)
+            record_manifest_for_object(obj)
+
+        if objects["IsTruncated"]:
+            # More objects to be got
+            objects = client.list_object_versions(Bucket=args.bucket, Prefix=args.prefix, \
+                KeyMarker=objects["NextMarker"])
+        else:
+            break
+    return
+
+def record_manifest_for_object(obj):
+    key    = obj['Key']
+    size   = obj['Size']
+    mtime  = str(math.floor(obj['LastModified'].timestamp()*1000))
+
+    if key.endswith('/'):
+        # Skip 'folders' in the manifest
+        return
+
+    if '##' in key:
+        raise "Sesparator string '##' encountered in a key!"
+
+    print('%s##%s##%s'%(mtime,key,size))
+    return
+
+
+if __name__=='__main__':
+    signal.signal(signal.SIGINT, signal_handler)
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-b', '--bucket', help='s3 bucket to cleanup', required=True)
+    parser.add_argument('-p', '--prefix', help='s3 path to restrict cleanup to', default="")
+    parser.add_argument('-v', '--verbose', help='print verbose informations from s3 objects', action='store_true')
+    parser.add_argument('--debug', help='enable debug output', action='store_true')
+    
+    args = parser.parse_args()
+
+    do_clean_versions()
+
+    sys.exit(0)

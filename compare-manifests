@@ -1,0 +1,99 @@
+#!/usr/bin/env python3
+#
+# MIT License
+#
+
+import os, sys, argparse, codecs, re
+
+sys.stdout = open(sys.stdout.fileno(), mode='w', encoding='utf8', buffering=1)
+
+class MObj(object):
+    def __init__(self, key, size, mtime):
+        self.key = key
+        self.size = size
+        self.mtime = mtime
+
+line_re = re.compile('([0-9]+)##(.+)##([0-9]+)')
+def parseline(line):
+    if not line:
+        return None
+
+    m = line_re.match(line)
+    if not m:
+        raise(Exception("Line '%s' not matched!"%(line,)))
+    mtime, key, size = m.groups()
+
+    return(MObj(key, int(size), int(mtime)))
+
+
+def manifest_line_for_object(obj):
+    key    = obj.key
+    size   = str(obj.size)
+    mtime  = str(obj.mtime)
+    
+    return('%s##%s##%s'%(mtime,key,size))
+
+def print_extra(obj):
+    print('+'+manifest_line_for_object(obj))
+    return
+
+def print_missing(obj):
+    print('-'+manifest_line_for_object(obj))
+    return
+
+def print_too_old(obj, master_obj):
+    print('!'+str(master_obj.mtime)+'_'+manifest_line_for_object(obj))
+    return
+
+def print_mismatch(obj, master_obj):
+    print('~'+manifest_line_for_object(obj)+'_'+str(master_obj.size))
+    return
+
+
+def do_compare():
+    master_file = codecs.open(args.master, 'r', 'utf-8')
+    replica_file = codecs.open(args.replica, 'r', 'utf-8')
+
+    mobj = parseline(master_file.readline())
+    robj = parseline(replica_file.readline())
+    while mobj or robj:
+        if not mobj or mobj.key > robj.key:
+            print_extra(robj)
+            robj = parseline(replica_file.readline())
+            continue
+
+        if not robj or mobj.key < robj.key:
+            print_missing(mobj)
+            mobj = parseline(master_file.readline())
+            continue
+
+        # Keys are equal..
+        if mobj.mtime > robj.mtime:
+            print_too_old(robj, mobj)
+        elif mobj.size != robj.size:
+            print_mismatch(robj, mobj)
+        else:
+            # The object is matched!
+            pass
+
+        mobj = parseline(master_file.readline())
+        robj = parseline(replica_file.readline())
+
+    replica_file.close()
+    master_file.close()
+    return
+
+if __name__=='__main__':
+    parser = argparse.ArgumentParser(description='Diff a master and a replica manifest.',\
+        epilog='Paths in master but not in replica are prepended with a +. '\
+            'Paths in replica but not in master are prepended with a -. '\
+            'Paths newer in master than in replica are prepended with a !. '\
+            'Paths where sizes don\'t match are prepended with a ~.')
+    parser.add_argument('-m', '--master', help='manifest file of master (source)', required=True)
+    parser.add_argument('-r', '--replica', help='manifest file of replica', required=True)
+    
+    args = parser.parse_args()
+
+    do_compare()
+
+    sys.exit(0)

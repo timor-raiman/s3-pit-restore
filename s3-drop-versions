@@ -1,0 +1,157 @@
+#!/usr/bin/env python3
+#
+# MIT License
+#
+
+import os, sys, time, signal, argparse, boto3, botocore, \
+        unittest, concurrent.futures, shutil, uuid, time
+from datetime import datetime, timezone
+from dateutil.parser import parse
+
+sys.stdout = open(sys.stdout.fileno(), mode='w', encoding='utf8', buffering=1)
+
+args = None
+executor = None
+transfer = None
+client = None
+dest_bucket = ''
+dest_prefix = ''
+futures = {}
+
+
+def signal_handler(signal, frame):
+    print("Gracefully exiting...")
+    if executor:
+        print("Shutting down executor...")
+        executor.shutdown(wait=False)
+    if futures:
+        for future in list(futures.keys()):
+            print("Cancelling futures...")
+            if not future.running():
+                future.cancel()
+                futures.pop(future, None)
+    sys.exit(-1)
+
+def s3_delte_key(obj):
+    if not args.forreal or args.forreal != args.bucket:
+        return
+    r = client.delete_object(Bucket=args.bucket, Key=obj['Key'], VersionId=obj['VersionId'])
+    return
+
+del_buffer = []
+def mark_for_deletion(obj, cause_obj, cause_type):
+    if cause_type == 'deleted':
+        explanation = 'DELETED ON '+str(cause_obj["LastModified"])
+    elif cause_type == 'overwritten':
+        explanation = 'DEPRICATED ON '+str(cause_obj["LastModified"])
+    elif cause_type == 'fully-wiped':
+        explanation = "FULL WIPEOUT"
+    else:
+        explanation = 'UNEXPECTED!!'
+
+    if not args.forreal or args.forreal != args.bucket:
+        action = "DRYRUN DELETING: "
+    else:
+        action = "DELETING: "
+        future = executor.submit(s3_delte_key, obj)
+        global futures
+        futures[future] = obj
+        global del_buffer
+        #del_buffer.append({'Key':obj["Key"], 'VersionId':obj["VersionId"]})
+
+    print(action + obj["Key"]+ " " + str(obj["LastModified"])+" "+explanation)
+    return
+
+def retain(obj):
+    print("RETAIN:   "+obj["Key"]+" "+str(obj["LastModified"]))
+    return
+
+
+def do_clean_versions():
+    global client
+    client = boto3.client('s3')
+    global transfer
+    transfer = boto3.s3.transfer.S3Transfer(client)
+    last_obj = {"Key":""}
+    dmarker  = {"Key":""}
+    global del_buffer
+    del_buffer = []
+
+    if args.debug: boto3.set_stream_logger('botocore')
+
+    global executor
+    executor = concurrent.futures.ThreadPoolExecutor(args.max_workers)
+
+    objects = client.list_object_versions(Bucket=args.bucket, Prefix=args.prefix) # cannot pass VersionIdMarker on first call
+    while (True):
+        if not "Versions" in objects:
+            print("Bucket not configured for versioning. Exiting.", file=sys.stderr)
+            sys.exit(1)
+        versions = objects['Versions']
+        if 'DeleteMarkers' in objects:
+            deletemarkers = objects['DeleteMarkers']
+        else:
+            deletemarkers = []
+
+        while(versions):
+            obj = versions.pop(0)
+
+            if args.mode == 'delete-all':
+                mark_for_deletion(obj, None, 'fully-wiped')
+                continue
+
+            if args.mode == 'retain-latest':
+                if obj["Key"] == last_obj["Key"]:
+                    # This is an older version of the object and should be deleted
+                    mark_for_deletion(obj, last_obj, 'overwritten')
+                    continue
+
+                # First time we see this key - check if it was deleted:
+                while deletemarkers and (dmarker["Key"] < obj["Key"]):
+                    dmarker = deletemarkers.pop(0)
+                if dmarker["Key"] == obj["Key"] and dmarker["LastModified"] > obj["LastModified"]:
+                    # The mostresent operation on this key was a delete - it should be deleted
+                    mark_for_deletion(obj, dmarker, 'deleted')
+                    last_obj = dmarker
+                    continue
+
+            # This object should be retained
+            retain(obj)
+            last_obj = obj
+
+        if objects["IsTruncated"]:
+            # More objects to be got
+            objects = client.list_object_versions(Bucket=args.bucket, Prefix=args.prefix, \
+                KeyMarker=objects["NextKeyMarker"], VersionIdMarker=objects["NextVersionIdMarker"])
+        else:
+            break
+
+    #print(repr(del_buffer))
+
+    for future in concurrent.futures.as_completed(futures):
+        if future in futures:
+            try:
+                future.result()
+                print("OK DELETE: "+repr(futures[future]))
+            except Exception as ex:
+                print('ERROR: %s --> %s"' % (ex, repr(futures[future])), file=sys.stderr)
+            del(futures[future])
+
+
+if __name__=='__main__':
+    signal.signal(signal.SIGINT, signal_handler)
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-b', '--bucket', help='s3 bucket to cleanup', required=True)
+    parser.add_argument('-p', '--prefix', help='s3 path to restrict cleanup to', default="")
+    parser.add_argument('-v', '--verbose', help='print verbose informations from s3 objects', action='store_true')
+    parser.add_argument('--forreal', help="Dryrun is the default; Pass '--forreal <bucket>' to actually issue delete requests", default='')
+    parser.add_argument('--debug', help='enable debug output', action='store_true')
+    parser.add_argument('--max-workers', help='max number of concurrent delete requests', default=1000, type=int)
+    parser.add_argument('--mode', help='What versions will be deleted', required=True, choices=['retain-all', 'retain-latest', 'delete-all'], default='retain-all')
+    
+    args = parser.parse_args()
+
+    do_clean_versions()
+
+    sys.exit(0)
