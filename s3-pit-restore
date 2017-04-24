@@ -32,6 +32,9 @@ import os, sys, time, signal, argparse, boto3, botocore, \
 from datetime import datetime, timezone
 from dateutil.parser import parse
 
+# Our keys often contain utf characters...
+sys.stdout = open(sys.stdout.fileno(), mode='w', encoding='utf8', buffering=1)
+
 args = None
 executor = None
 transfer = None
