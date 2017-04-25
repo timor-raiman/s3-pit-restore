@@ -54,10 +54,21 @@ def do_compare():
     master_file = codecs.open(args.master, 'r', 'utf-8')
     replica_file = codecs.open(args.replica, 'r', 'utf-8')
 
+    master_size  = 0
+    master_count = 0
+    extra_count  = 0
+    extra_size   = 0
+    replicated_size  = 0
+    replicated_count = 0
     mobj = parseline(master_file.readline())
     robj = parseline(replica_file.readline())
+    if mobj:
+        master_size  += mobj.size
+        master_count += 1
     while mobj or robj:
         if not mobj or mobj.key > robj.key:
+            extra_count += 1
+            extra_size  += robj.size
             print_extra(robj)
             robj = parseline(replica_file.readline())
             continue
@@ -65,6 +76,9 @@ def do_compare():
         if not robj or mobj.key < robj.key:
             print_missing(mobj)
             mobj = parseline(master_file.readline())
+            if mobj:
+                master_size  += mobj.size
+                master_count += 1
             continue
 
         # Keys are equal..
@@ -74,13 +88,31 @@ def do_compare():
             print_mismatch(robj, mobj)
         else:
             # The object is matched!
-            pass
+            replicated_size  += mobj.size
+            replicated_count += 1
 
         mobj = parseline(master_file.readline())
         robj = parseline(replica_file.readline())
+        if mobj:
+            master_size  += mobj.size
+            master_count += 1
 
     replica_file.close()
     master_file.close()
+
+
+    replication_size_fraction   = float(replicated_size)/master_size
+    replicateion_count_fraction = float(replicated_count)/master_count
+    extra_size_fraction         = float(extra_size)/master_size
+    extra_count_fraction        = float(extra_count)master_count
+
+    if args.summarise:
+        print("    MASTER: %d objects, %d bytes." %(master_count, master_size))
+        print("REPLICATED: %d objects (%.2f%%), %d bytes (%.2f%%)" % \
+                (replicated_count, replicateion_count_fraction*100, replicated_size, replication_size_fraction*100))
+        print("  NOMASTER: %d objects (%.2f%%), %d bytes (%.2f%%)" % \
+                (extra_count, extra_count_fraction*100, extra_size, extra_size_fraction*100)
+
     return
 
 if __name__=='__main__':
@@ -91,6 +123,7 @@ if __name__=='__main__':
             'Paths where sizes don\'t match are prepended with a ~.')
     parser.add_argument('-m', '--master', help='manifest file of master (source)', required=True)
     parser.add_argument('-r', '--replica', help='manifest file of replica', required=True)
+    parser.add_argument('-s', '--summarise', help='summarise the delta heuristics', action='store_true')
     
     args = parser.parse_args()
 
