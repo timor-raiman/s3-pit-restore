@@ -202,6 +202,10 @@ def record_manifest_for_object(obj, ofile):
         # Skip 'folders' in the manifest
         return
 
+    if args.prefix:
+        # The generated manifest should will be WRT to the common prefix..
+        key = key[len(args.prefix):] 
+
     if '##' in key:
         raise "Sesparator string '##' encountered in a key!"
 
