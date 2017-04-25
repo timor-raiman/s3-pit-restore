@@ -68,7 +68,7 @@ def do_compare():
         master_size  += mobj.size
         master_count += 1
     while mobj or robj:
-        if not mobj or mobj.key > robj.key:
+        if not mobj or (robj and mobj.key > robj.key):
             extra_count += 1
             extra_size  += robj.size
             print_extra(robj)
