@@ -130,8 +130,8 @@ def exit_if_exceeds(base, value, message):
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser(description='Diff a master and a replica manifest.',\
-        epilog='Paths in master but not in replica are prepended with a +. '\
-            'Paths in replica but not in master are prepended with a -. '\
+        epilog='Paths in master but not in replica are prepended with a -. '\
+            'Paths in replica but not in master are prepended with a +. '\
             'Paths newer in master than in replica are prepended with a !. '\
             'Paths where sizes don\'t match are prepended with a ~.')
     parser.add_argument('-m', '--master', help='manifest file of master (source)', required=True)
