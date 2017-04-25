@@ -28,7 +28,7 @@
 # SOFTWARE.
 
 import os, sys, time, signal, argparse, boto3, botocore, \
-        unittest, concurrent.futures, shutil, uuid, codecs
+        unittest, concurrent.futures, shutil, uuid, codecs, math
 from datetime import datetime, timezone
 from dateutil.parser import parse
 
@@ -225,7 +225,7 @@ def do_restore():
     executor = concurrent.futures.ThreadPoolExecutor(args.max_workers)
 
     if args.manifest_file:
-        manifest_file = codecs.open(fargs.manifest_file, 'w', 'utf-8')
+        manifest_file = codecs.open(args.manifest_file, 'w', 'utf-8')
     else:
         manifest_file = None
 
