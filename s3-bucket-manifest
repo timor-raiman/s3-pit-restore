@@ -41,7 +41,7 @@ def do_clean_versions():
 
         if objects["IsTruncated"]:
             # More objects to be got
-            objects = client.list_object_versions(Bucket=args.bucket, Prefix=args.prefix, \
+            objects = client.list_objects_v2(Bucket=args.bucket, Prefix=args.prefix, \
                 ContinuationToken=objects['NextContinuationToken'])
         else:
             break
