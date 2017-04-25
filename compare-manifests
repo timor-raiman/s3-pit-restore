@@ -115,7 +115,18 @@ def do_compare():
         print("  NOMASTER: %d objects (%.2f%%), %d bytes (%.2f%%)" % \
                 (extra_count, extra_count_fraction*100, extra_size, extra_size_fraction*100))
 
+    if args.min_replicated_size_fraction is not None and replication_size_fraction < args.min_replicated_size_fraction:
+        sys.exit(1)
+    if args.min_replicated_count_fraction is not None and replication_count_fraction < args.min_replicated_count_fraction:
+        sys.exit(2)
+    if args.max_extra_size_fraction is not None and extra_size_fraction > args.max_extra_size_fraction:
+        sys.exit(3)
+    if args.max_extra_count_fraction is not None and extra_count_fraction > args.max_extra_count_fraction:
+        sys.exit(4)
+
     return
+
+def exit_if_exceeds(base, value, message):
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser(description='Diff a master and a replica manifest.',\
@@ -126,7 +137,21 @@ if __name__=='__main__':
     parser.add_argument('-m', '--master', help='manifest file of master (source)', required=True)
     parser.add_argument('-r', '--replica', help='manifest file of replica', required=True)
     parser.add_argument('-s', '--summarise', help='summarise the delta heuristics', action='store_true')
+    parser.add_argument('-Z', '--min-replicated-size-fraction', type=float, \
+        help='When provided, exit value will be non-zero if the replica manifest accounts for less than this '\
+            'fraction of the master manifest by size')
+    parser.add_argument('-z', '--min-replicated-count-fraction', type=float, \
+        help='When provided, exit value will be non-zero if the replica manifest accounts for less than this '
+            'fraction of the master manifest by object count')
+    parser.add_argument('-X', '--max-extra-size-fraction', type=float, \
+        help='When provided, exit value will be non-zero if the total size of objects in the replica manifest'\
+            'without a counterpart in the master manifest is larger than this fraction of the master\'s size')
+    parser.add_argument('-x', '--max-extra-count-fraction', type=float, \
+        help='When provided, exit value will be non-zero if the number of objects in the replica manifest'\
+            'without a counterpart in the master manifest is larger than this fraction of the number of objects in the master')
+
     
+
     args = parser.parse_args()
 
     do_compare()
