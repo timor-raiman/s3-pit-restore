@@ -126,8 +126,6 @@ def do_compare():
 
     return
 
-def exit_if_exceeds(base, value, message):
-
 if __name__=='__main__':
     parser = argparse.ArgumentParser(description='Diff a master and a replica manifest.',\
         epilog='Paths in master but not in replica are prepended with a -. '\
