@@ -117,6 +117,7 @@ def signal_handler(signal, frame):
             future.cancel()
             futures.pop(future, None)
     print("Gracefully exiting ...")
+    sys.exit(1)
 
 def print_obj(obj, optional_message=""):
     if args.verbose:
@@ -125,6 +126,10 @@ def print_obj(obj, optional_message=""):
         print(obj["Key"])
 
 def handled_by_glacier(obj):
+    if arg.dry_run:
+        print_obj(obj)
+        return False
+
     if obj["StorageClass"] == "GLACIER" and not args.enable_glacier:
         print_obj(obj)
         return true
@@ -151,6 +156,10 @@ def handled_by_glacier(obj):
         return False
 
 def handled_by_standard(obj):
+    if arg.dry_run:
+        print_obj(obj)
+        return True
+
     if obj["Key"].endswith("/"):
         if not os.path.exists(obj["Key"]):
             os.makedirs(obj["Key"])
@@ -159,17 +168,18 @@ def handled_by_standard(obj):
     if key_path and not os.path.exists(key_path):
             os.makedirs(key_path)
     try:
-        if not args.dry_run:
-            future = executor.submit(download_file, obj)
-            global futures
-            futures[future] = obj
-        else:
-            print_obj(obj)
+        future = executor.submit(download_file, obj)
+        global futures
+        futures[future] = obj
     except RuntimeError:
         return False
     return True
 
 def handled_by_copy(obj):
+    if arg.dry_run:
+        print_obj(obj)
+        return True
+
     future = executor.submit(s3_copy_key, obj)
     global futures
     futures[future] = obj
