@@ -31,7 +31,7 @@ def do_clean_versions():
     
     if args.debug: boto3.set_stream_logger('botocore')
 
-    objects = client.list_objects(Bucket=args.bucket, Prefix=args.prefix) # cannot pass VersionIdMarker on first call
+    objects = client.list_objects_v2(Bucket=args.bucket, Prefix=args.prefix) # cannot pass VersionIdMarker on first call
     while (True):
         contents = objects['Contents']
         
@@ -42,7 +42,7 @@ def do_clean_versions():
         if objects["IsTruncated"]:
             # More objects to be got
             objects = client.list_object_versions(Bucket=args.bucket, Prefix=args.prefix, \
-                KeyMarker=objects["NextMarker"])
+                ContinuationToken=objects['NextContinuationToken'])
         else:
             break
     return
