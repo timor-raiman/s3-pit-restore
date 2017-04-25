@@ -42,7 +42,7 @@ def print_missing(obj):
     return
 
 def print_too_old(obj, master_obj):
-    print('!'+str(master_obj.mtime)+'_'+manifest_line_for_object(obj))
+    print('!'+str(master_obj.mtime)+'_'+manifest_line_for_object(obj)+'_'+str(master_obj.size))
     return
 
 def print_mismatch(obj, master_obj):
