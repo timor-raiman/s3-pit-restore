@@ -250,7 +250,7 @@ def do_restore():
         dest_bucket, dest_prefix = (dest+'/')[len('s3://'):].split('/', 1)
         dest_prefix = dest_prefix.strip('/')
         if dest_prefix: dest_prefix = dest_prefix+'/' # Empty string or /-terminated
-    else:
+    elif not args.dry_run:
         if not os.path.exists(dest):
             os.makedirs(dest)
         os.chdir(dest)
@@ -330,7 +330,7 @@ if __name__=='__main__':
     parser.add_argument('-p', '--prefix', help='s3 path to restore from', default="")
     parser.add_argument('-t', '--timestamp', help='final point in time to restore at')
     parser.add_argument('-f', '--from-timestamp', help='starting point in time to restore from')
-    parser.add_argument('-d', '--dest', help='path where recovering to; can be an s3 bucket address', required=True)
+    parser.add_argument('-d', '--dest', help='path where recovering to; can be an s3 bucket address')
     parser.add_argument('-e', '--enable-glacier', help='enable recovering from glacier', action='store_true')
     parser.add_argument('-v', '--verbose', help='print verbose informations from s3 objects', action='store_true')
     parser.add_argument('--dry-run', help='execute query without transferring files', action='store_true')
@@ -339,6 +339,9 @@ if __name__=='__main__':
     parser.add_argument('--max-workers', help='max number of concurrent download requests', default=10, type=int)
     parser.add_argument('--manifest-file', help='path to local file (created) to output manifest to')
     args = parser.parse_args()
+
+    if not args.dry_run and args.dest is None:
+        parser.error("--dest is required unless --dry_run is given")
 
     if not args.test:
         do_restore()
