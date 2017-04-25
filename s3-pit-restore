@@ -126,7 +126,7 @@ def print_obj(obj, optional_message=""):
         print(obj["Key"])
 
 def handled_by_glacier(obj):
-    if arg.dry_run:
+    if args.dry_run:
         print_obj(obj)
         return False
 
@@ -156,7 +156,7 @@ def handled_by_glacier(obj):
         return False
 
 def handled_by_standard(obj):
-    if arg.dry_run:
+    if args.dry_run:
         print_obj(obj)
         return True
 
@@ -176,7 +176,7 @@ def handled_by_standard(obj):
     return True
 
 def handled_by_copy(obj):
-    if arg.dry_run:
+    if args.dry_run:
         print_obj(obj)
         return True
 
