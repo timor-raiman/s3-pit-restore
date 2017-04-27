@@ -266,7 +266,7 @@ def do_restore():
         manifest_file = None
 
     destination_is_s3 = False
-    if dest.startswith("s3://"):
+    if dest is not None and dest.startswith("s3://"):
         destination_is_s3 = True
         global dest_bucket, dest_prefix
         dest_bucket, dest_prefix = split_s3_path(dest)
