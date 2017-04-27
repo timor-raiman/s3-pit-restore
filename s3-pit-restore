@@ -250,7 +250,7 @@ def do_restore():
         pit_start_date = datetime.fromtimestamp(0, timezone.utc)
     elif args.from_timestamp.startswith('s3://'):
         pit_start_date = get_s3_last_modified(args.from_timestamp)
-        print("Using from-timestamp '%s' via %s"(str(pit_start_date), args.from_timestamp), file=sys.stderr)
+        print("Using from-timestamp '%s' via %s"%(str(pit_start_date), args.from_timestamp), file=sys.stderr)
     else:
         pit_start_date = parse(args.from_timestamp)
 
@@ -258,7 +258,7 @@ def do_restore():
         pit_end_date = datetime.now(timezone.utc)   # TODO: not robust against faulty system time
     elif args.timestamp.startswith('s3://'):
         pit_end_date = get_s3_last_modified(args.timestamp)
-        print("Using timestamp '%s' via %s"(str(pit_end_date), args.timestamp), file=sys.stderr)
+        print("Using timestamp '%s' via %s"%(str(pit_end_date), args.timestamp), file=sys.stderr)
     else:
         pit_end_date = parse(args.timestamp)
 
