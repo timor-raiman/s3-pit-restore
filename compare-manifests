@@ -111,7 +111,7 @@ def do_compare():
     if args.summarise:
         print("    MASTER: %d objects, %d bytes." %(master_count, master_size))
         print("REPLICATED: %d objects (%.2f%%), %d bytes (%.2f%%)" % \
-                (replicated_count, replicateion_count_fraction*100, replicated_size, replication_size_fraction*100))
+                (replicated_count, replication_count_fraction*100, replicated_size, replication_size_fraction*100))
         print("  NOMASTER: %d objects (%.2f%%), %d bytes (%.2f%%)" % \
                 (extra_count, extra_count_fraction*100, extra_size, extra_size_fraction*100))
 
