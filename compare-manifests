@@ -104,7 +104,7 @@ def do_compare():
 
 
     replication_size_fraction   = float(replicated_size)/master_size
-    replicateion_count_fraction = float(replicated_count)/master_count
+    replication_count_fraction  = float(replicated_count)/master_count
     extra_size_fraction         = float(extra_size)/master_size
     extra_count_fraction        = float(extra_count)/master_count
 
