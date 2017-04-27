@@ -222,9 +222,17 @@ def record_manifest_for_object(obj, ofile):
     ofile.write('%s##%s##%s\n'%(mtime,key,size))
     return
 
+def split_s3_path(s3_path):
+    bucket, key = (s3_path+'/')[len('s3://'):].split('/', 1)
+    key = key.strip('/')
+    return (bucket, key)
+
+def get_s3_last_modified(s3_path):
+    s3  = boto3.resource('s3')
+    obj = s3.Object(*split_s3_path(s3_path))
+    return obj.last_modified
+
 def do_restore():
-    pit_start_date = (parse(args.from_timestamp) if args.from_timestamp else datetime.fromtimestamp(0, timezone.utc))
-    pit_end_date = (parse(args.timestamp) if args.timestamp else datetime.now(timezone.utc))
     global client
     client = boto3.client('s3')
     global transfer
@@ -238,6 +246,20 @@ def do_restore():
     global executor
     executor = concurrent.futures.ThreadPoolExecutor(args.max_workers)
 
+    if args.from_timestamp is None:
+        pit_start_date = datetime.fromtimestamp(0, timezone.utc)
+    elif args.from_timestamp.startswith('s3://'):
+        pit_start_date = get_s3_last_modified(args.from_timestamp)
+    else:
+        pit_start_date = parse(args.from_timestamp)
+
+    if args.timestamp is None:
+        pit_end_date = datetime.now(timezone.utc)   # TODO: not robust against faulty system time
+    elif args.timestamp.startswith('s3://'):
+        pit_end_date = get_s3_last_modified(args.timestamp)
+    else:
+        pit_end_date = parse(args.timestamp)
+
     if args.manifest_file:
         manifest_file = codecs.open(args.manifest_file, 'w', 'utf-8')
     else:
@@ -247,8 +269,7 @@ def do_restore():
     if dest.startswith("s3://"):
         destination_is_s3 = True
         global dest_bucket, dest_prefix
-        dest_bucket, dest_prefix = (dest+'/')[len('s3://'):].split('/', 1)
-        dest_prefix = dest_prefix.strip('/')
+        dest_bucket, dest_prefix = split_s3_path(dest)
         if dest_prefix: dest_prefix = dest_prefix+'/' # Empty string or /-terminated
     elif not args.dry_run:
         if not os.path.exists(dest):
@@ -328,8 +349,10 @@ if __name__=='__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-b', '--bucket', help='s3 bucket to restore from', required=True)
     parser.add_argument('-p', '--prefix', help='s3 path to restore from', default="")
-    parser.add_argument('-t', '--timestamp', help='final point in time to restore at')
-    parser.add_argument('-f', '--from-timestamp', help='starting point in time to restore from')
+    parser.add_argument('-t', '--timestamp', help='final point in time to restore at; can be path to s3 object, '\
+                        'in which case, the LastModified date of the object is taken')
+    parser.add_argument('-f', '--from-timestamp', help='starting point in time to restore from; can be path to s3 object, '\
+                        'in which case, the LastModified date of the object is taken')
     parser.add_argument('-d', '--dest', help='path where recovering to; can be an s3 bucket address')
     parser.add_argument('-e', '--enable-glacier', help='enable recovering from glacier', action='store_true')
     parser.add_argument('-v', '--verbose', help='print verbose informations from s3 objects', action='store_true')
