@@ -103,10 +103,10 @@ def do_compare():
     master_file.close()
 
 
-    replication_size_fraction   = float(replicated_size)/master_size
-    replication_count_fraction  = float(replicated_count)/master_count
-    extra_size_fraction         = float(extra_size)/master_size
-    extra_count_fraction        = float(extra_count)/master_count
+    replication_size_fraction   = float(replicated_size)/master_size if master_size > 0 else 1.0
+    replication_count_fraction  = float(replicated_count)/master_count if master_count > 0 else 1.0
+    extra_size_fraction         = float(extra_size)/master_size if master_size > 0 else extra_size
+    extra_count_fraction        = float(extra_count)/master_count if master_count > 0 else extra_count
 
     if args.summarise:
         print("    MASTER: %d objects, %d bytes." %(master_count, master_size))
