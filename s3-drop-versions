@@ -83,6 +83,10 @@ def do_clean_versions():
     executor = concurrent.futures.ThreadPoolExecutor(args.max_workers)
 
     objects = client.list_object_versions(Bucket=args.bucket, Prefix=args.prefix) # cannot pass VersionIdMarker on first call
+    
+    now = datetime.now(timezone.utc)    # TODO: not robust against faulty system time
+                                        # but - we rely on AWS refusing our requests if theres is a drift > 15 minutes
+
     while (True):
         if not "Versions" in objects:
             print("Bucket not configured for versioning. Exiting.", file=sys.stderr)
@@ -100,7 +104,7 @@ def do_clean_versions():
                 mark_for_deletion(obj, None, 'fully-wiped')
                 continue
 
-            if args.mode == 'retain-latest':
+            elif args.mode == 'retain-latest':
                 if obj["Key"] == last_obj["Key"]:
                     # This is an older version of the object and should be deleted
                     mark_for_deletion(obj, last_obj, 'overwritten')
@@ -114,6 +118,53 @@ def do_clean_versions():
                     mark_for_deletion(obj, dmarker, 'deleted')
                     last_obj = dmarker
                     continue
+
+            elif args.mode == 'strategy':
+                # Following the retention strategy:
+                # * we don't look @ deletions
+                # * we always retain the latest version (even if deleted)
+                # * for versions 7 days or youger, we retain if the version is of a different day than the last retained one
+                # * for versions 8-30 days old, we retain if the version is of a different week 
+                # * for versions 30-365 days old, we retain if the version is of a different month
+                # * for versions older than 365 days, we retain if the version is of a different year
+
+                if obj["Key"] != last_obj["Key"]:
+                    # First time we see it. Newest - retain even if deleted..
+                    retain(obj)
+                    last_obj = obj
+                    continue
+
+                age           = now - obj["LastModified"]
+                retained_date = last_obj["LastModified"]
+                version_date  = obj["LastModified"]
+
+                if age.days < 7:
+                    if (retained_date.day, retained_date.month, retained_date.year) != \
+                        (version_date.day, version_date.month, version_date.year):
+                        retain(obj)
+                        last_obj = obj
+                        continue
+                elif age.days < 30:
+                    if (retained_date.isocalendar()[1], retained_date.year) != \
+                        (version_date.isocalendar()[1], version_date.year):
+                        retain(obj)
+                        last_obj = obj
+                        continue
+                elif age.days < 365:
+                    if (retained_date.month, retained_date.year) != \
+                        (version_date.month, version_date.year):
+                        retain(obj)
+                        last_obj = obj
+                        continue
+                else:
+                    if retained_date.year != version_date.year:
+                        retain(obj)
+                        last_obj = obj
+                        continue
+
+                # This is version does is extraneous acc. to retention strategy...
+                mark_for_deletion(obj, last_obj, 'overwritten')
+                continue
 
             # This object should be retained
             retain(obj)
@@ -148,7 +199,7 @@ if __name__=='__main__':
     parser.add_argument('--forreal', help="Dryrun is the default; Pass '--forreal <bucket>' to actually issue delete requests", default='')
     parser.add_argument('--debug', help='enable debug output', action='store_true')
     parser.add_argument('--max-workers', help='max number of concurrent delete requests', default=1000, type=int)
-    parser.add_argument('--mode', help='What versions will be deleted', required=True, choices=['retain-all', 'retain-latest', 'delete-all'], default='retain-all')
+    parser.add_argument('--mode', help='What versions will be deleted', required=True, choices=['retain-all', 'retain-latest', 'delete-all', 'strategy'], default='retain-all')
     
     args = parser.parse_args()
 
