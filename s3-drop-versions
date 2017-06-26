@@ -38,8 +38,10 @@ def s3_delte_key(obj):
     r = client.delete_object(Bucket=args.bucket, Key=obj['Key'], VersionId=obj['VersionId'])
     return
 
-global del_buffer = []
-global deleted_size = 0
+global del_buffer
+del_buffer = []
+global deleted_size
+deleted_size = 0
 def mark_for_deletion(obj, cause_obj, cause_type):
     if cause_type == 'deleted':
         explanation = 'DELETED ON '+str(cause_obj["LastModified"])
@@ -67,8 +69,10 @@ def mark_for_deletion(obj, cause_obj, cause_type):
     print(action + obj["Key"]+ " " + str(obj["LastModified"])+" "+explanation)
     return
 
-global retained_size = 0
-global retained_sizes = {}
+global retained_size
+retained_size = 0
+global retained_sizes
+retained_sizes = {}
 def retain(obj, explanation=""):
     if explanation not in retained_sizes:
         retained_sizes[explanation] = 0
