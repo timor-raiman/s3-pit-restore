@@ -65,7 +65,7 @@ def mark_for_deletion(obj, cause_obj, cause_type):
     return
 
 def retain(obj, explanation=""):
-    print("RETAIN:   "+obj["Key"]+" "+str(obj["LastModified"]+explanation))
+    print("RETAIN:   "+obj["Key"]+" "+str(obj["LastModified"])+explanation)
     return
 
 
