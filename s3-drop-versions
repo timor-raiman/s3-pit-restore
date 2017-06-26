@@ -136,7 +136,7 @@ def do_clean_versions():
 
                 if obj["Key"] != last_obj["Key"]:
                     # First time we see it. Newest - retain even if deleted..
-                    retain(obj, "(latest)")
+                    retain(obj, " (latest)")
                     last_obj = obj
                     continue
 
