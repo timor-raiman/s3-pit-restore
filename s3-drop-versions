@@ -212,6 +212,6 @@ if __name__=='__main__':
     do_clean_versions()
 
     global deleted_size
-    print "Deleted Size: "+str(deleted_size/1024.0/1024.0/1024.0)+"GB"
+    print("Deleted Size: "+str(deleted_size/1024.0/1024.0/1024.0)+"GB")
 
     sys.exit(0)
