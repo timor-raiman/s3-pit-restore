@@ -39,6 +39,7 @@ def s3_delte_key(obj):
     return
 
 del_buffer = []
+deleted_size = 0
 def mark_for_deletion(obj, cause_obj, cause_type):
     if cause_type == 'deleted':
         explanation = 'DELETED ON '+str(cause_obj["LastModified"])
@@ -60,6 +61,9 @@ def mark_for_deletion(obj, cause_obj, cause_type):
         futures[future] = obj
         global del_buffer
         #del_buffer.append({'Key':obj["Key"], 'VersionId':obj["VersionId"]})
+
+    global deleted_size
+    deleted_size += obj["Size"]
 
     print(action + obj["Key"]+ " " + str(obj["LastModified"])+" "+explanation)
     return
@@ -206,5 +210,8 @@ if __name__=='__main__':
     args = parser.parse_args()
 
     do_clean_versions()
+
+    global deleted_size
+    print "Deleted Size: "+str(deleted_size/1024.0/1024.0/1024.0)+"GB"
 
     sys.exit(0)
