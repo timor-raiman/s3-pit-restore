@@ -68,7 +68,13 @@ def mark_for_deletion(obj, cause_obj, cause_type):
     print(action + obj["Key"]+ " " + str(obj["LastModified"])+" "+explanation)
     return
 
+retained_size = 0
+retained_sizes = {}
 def retain(obj, explanation=""):
+    if explanation not in retained_sizes:
+        retained_sizes[explanation] = 0
+    retained_sizes[explanation] += obj['Size']
+    retained_size               += obj['Size']
     print("RETAIN:   "+obj["Key"]+" "+str(obj["LastModified"])+explanation)
     return
 
@@ -195,6 +201,9 @@ def do_clean_versions():
             del(futures[future])
 
 
+def bytes_to_gb(bytes):
+    return(bytes/1024.0/1024.0/1024.0)
+
 if __name__=='__main__':
     signal.signal(signal.SIGINT, signal_handler)
 
@@ -212,6 +221,14 @@ if __name__=='__main__':
     do_clean_versions()
 
     global deleted_size
-    print("Deleted Size: "+str(deleted_size/1024.0/1024.0/1024.0)+"GB")
+    global retained_size
+    global retained_sizes
+
+    deleted_percent = float(deleted_size)/(retained_size+deleted_size)*100
+    print("Retained Size: %.3f G" %(bytes_to_gb(retained_size)))
+    print("Retained Size: %.3f G (%.3f%%)" %(bytes_to_gb(deleted_size), deleted_percent))
+
+    for explanation in retained_sizes:
+        print("Retained as %s: %.3f G"%(explanation, bytes_to_gb(retained_sizes[explanation])))
 
     sys.exit(0)
