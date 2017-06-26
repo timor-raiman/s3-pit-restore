@@ -46,6 +46,8 @@ def mark_for_deletion(obj, cause_obj, cause_type):
         explanation = 'DEPRICATED ON '+str(cause_obj["LastModified"])
     elif cause_type == 'fully-wiped':
         explanation = "FULL WIPEOUT"
+    elif cause_type == 'out-of-policy':
+        explanation = 'RETAINED VERSION EXISTS FOR '+str(cause_obj["LastModified"])
     else:
         explanation = 'UNEXPECTED!!'
 
@@ -62,8 +64,8 @@ def mark_for_deletion(obj, cause_obj, cause_type):
     print(action + obj["Key"]+ " " + str(obj["LastModified"])+" "+explanation)
     return
 
-def retain(obj):
-    print("RETAIN:   "+obj["Key"]+" "+str(obj["LastModified"]))
+def retain(obj, explanation=""):
+    print("RETAIN:   "+obj["Key"]+" "+str(obj["LastModified"]+explanation))
     return
 
 
@@ -141,29 +143,29 @@ def do_clean_versions():
                 if age.days < 7:
                     if (retained_date.day, retained_date.month, retained_date.year) != \
                         (version_date.day, version_date.month, version_date.year):
-                        retain(obj)
+                        retain(obj, " (daily)")
                         last_obj = obj
                         continue
                 elif age.days < 30:
                     if (retained_date.isocalendar()[1], retained_date.year) != \
                         (version_date.isocalendar()[1], version_date.year):
-                        retain(obj)
+                        retain(obj, " (weekly)")
                         last_obj = obj
                         continue
                 elif age.days < 365:
                     if (retained_date.month, retained_date.year) != \
                         (version_date.month, version_date.year):
-                        retain(obj)
+                        retain(obj, " (month)")
                         last_obj = obj
                         continue
                 else:
                     if retained_date.year != version_date.year:
-                        retain(obj)
+                        retain(obj, " (yearly)")
                         last_obj = obj
                         continue
 
                 # This is version does is extraneous acc. to retention strategy...
-                mark_for_deletion(obj, last_obj, 'overwritten')
+                mark_for_deletion(obj, last_obj, 'out-of-policy')
                 continue
 
             # This object should be retained
